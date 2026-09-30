@@ -666,6 +666,7 @@
         let obstacles = [];
         let spawnRate = 2000;
         let lastSpawn = 0;
+        let gameStartTime = 0;
         let gameLoop;
         let isSliding = false;
         let dashing = false;
@@ -723,7 +724,7 @@
         }
 
         // 장애물 생성 (앞에서 각기 다른 속도로)
-        function spawnObstacle() {
+        function spawnObstacle(fixedBottom) {
             const obstacle = document.createElement('div');
             obstacle.className = 'obstacle';
 
@@ -734,9 +735,11 @@
             const speed = 3 + Math.random() * 9;
             obstacle.dataset.speed = speed;
 
-            // 오른쪽(앞)에서 생성, 랜덤 높이
+            // 오른쪽(앞)에서 생성, 랜덤 높이 (지정된 높이가 있으면 사용)
             const bottomPositions = [60, 100, 140, 180, 220];
-            const bottom = bottomPositions[Math.floor(Math.random() * bottomPositions.length)];
+            const bottom = fixedBottom !== undefined
+                ? fixedBottom
+                : bottomPositions[Math.floor(Math.random() * bottomPositions.length)];
 
             obstacle.style.right = '-60px';
             obstacle.style.bottom = bottom + 'px';
@@ -977,15 +980,33 @@
         function update(timestamp) {
             if (!gameRunning) return;
 
+            // 첫 프레임 기준 시간 기록
+            if (!gameStartTime) {
+                gameStartTime = timestamp;
+                lastSpawn = timestamp;
+            }
+
             // 닌자 물리 업데이트
             updateNinjaPhysics();
 
-            // 장애물 생성
+            // 장애물 생성 (시간이 갈수록 더 많이, 더 자주)
             if (timestamp - lastSpawn > spawnRate) {
-                spawnObstacle();
+                // 경과 시간(초)에 따라 한 번에 나오는 장애물 수 증가
+                const elapsed = (timestamp - gameStartTime) / 1000;
+                const maxBatch = Math.min(1 + Math.floor(elapsed / 15), 4);
+                const batch = 1 + Math.floor(Math.random() * maxBatch);
+
+                // 같은 높이에 겹치지 않도록 높이를 나눠서 생성
+                const available = [60, 100, 140, 180, 220];
+                for (let b = 0; b < batch && available.length > 0; b++) {
+                    const pick = available.splice(Math.floor(Math.random() * available.length), 1)[0];
+                    spawnObstacle(pick);
+                }
+
                 lastSpawn = timestamp;
 
-                if (spawnRate > 800) spawnRate -= 20;
+                // 생성 간격도 갈수록 짧아짐 (최소 300ms)
+                if (spawnRate > 300) spawnRate -= 35;
             }
 
             // 장애물 이동 및 충돌 체크
@@ -1020,6 +1041,7 @@
             score = 0;
             spawnRate = 2000;
             lastSpawn = 0;
+            gameStartTime = 0;
             ninjaY = groundY;
             velocityY = 0;
             isJumping = false;
