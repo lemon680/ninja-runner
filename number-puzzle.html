@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>숫자 메모리 게임</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .game-container {
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            max-width: 420px;
+            width: 100%;
+            border: 1px solid #e8eaed;
+        }
+
+        h1 {
+            color: #1a1a2e;
+            margin-bottom: 8px;
+            font-size: 1.6em;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .setup-panel {
+            margin-bottom: 24px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 16px;
+            border: 1px solid #e8eaed;
+        }
+
+        .setup-panel h3 {
+            color: #1a1a2e;
+            font-size: 0.95em;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .setup-panel p {
+            color: #888;
+            font-size: 0.8em;
+            margin-bottom: 16px;
+        }
+
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .input-grid input {
+            width: 100%;
+            padding: 10px 8px;
+            border: 2px solid #e8eaed;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #1a1a2e;
+            background: #fff;
+            transition: all 0.2s ease;
+        }
+
+        .input-grid input:focus {
+            outline: none;
+            border-color: #1a1a2e;
+            box-shadow: 0 0 0 3px rgba(26, 26, 46, 0.1);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 24px;
+            padding: 16px 24px;
+            background: #f8f9fa;
+            border-radius: 16px;
+            border: 1px solid #e8eaed;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.75em;
+            color: #888;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 1.4em;
+            font-weight: 700;
+            color: #1a1a2e;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 24px;
+            aspect-ratio: 1;
+            perspective: 1000px;
+        }
+
+        .card {
+            position: relative;
+            cursor: pointer;
+            transform-style: preserve-3d;
+            transition: transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
+        }
+
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card.matched {
+            cursor: default;
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            font-weight: 700;
+        }
+
+        .card-front {
+            background: #0a0a1a;
+            color: #00ffff;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3), inset 0 0 10px rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+        }
+
+        .card-front::before {
+            content: '?';
+            font-size: 1.2em;
+            font-weight: 400;
+            color: #00ffff;
+            text-shadow: 
+                0 0 5px #00ffff,
+                0 0 10px #00ffff,
+                0 0 20px #00ffff,
+                0 0 40px #00ffff;
+            animation: neonFlicker 2s infinite alternate;
+        }
+
+        @keyframes neonFlicker {
+            0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+                text-shadow: 
+                    0 0 5px #00ffff,
+                    0 0 10px #00ffff,
+                    0 0 20px #00ffff,
+                    0 0 40px #00ffff;
+                opacity: 1;
+            }
+            20%, 24%, 55% {
+                text-shadow: none;
+                opacity: 0.8;
+            }
+        }
+
+        .card-back {
+            background: #ffffff;
+            color: #1a1a2e;
+            transform: rotateY(180deg);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            border: 2px solid #e8eaed;
+            padding: 4px;
+            word-break: break-all;
+            line-height: 1.2;
+        }
+
+        .card.matched .card-back {
+            background: #1a1a2e;
+            color: #fff;
+            border-color: #1a1a2e;
+            animation: matchPulse 0.4s ease;
+        }
+
+        .card.wrong .card-back {
+            background: #ff6b6b;
+            color: #fff;
+            border-color: #ff6b6b;
+            animation: shake 0.4s ease;
+        }
+
+        @keyframes matchPulse {
+            0%, 100% { transform: rotateY(180deg) scale(1); }
+            50% { transform: rotateY(180deg) scale(1.08); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: rotateY(180deg) translateX(0); }
+            25% { transform: rotateY(180deg) translateX(-4px); }
+            75% { transform: rotateY(180deg) translateX(4px); }
+        }
+
+        .card:not(.flipped):not(.matched):hover {
+            transform: scale(1.03);
+        }
+
+        .card:not(.flipped):not(.matched):hover .card-front {
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5), inset 0 0 15px rgba(0, 255, 255, 0.15);
+        }
+
+        .btn {
+            background: #1a1a2e;
+            color: #ffffff;
+            border: none;
+            padding: 14px 36px;
+            font-size: 0.95em;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            letter-spacing: 0.3px;
+        }
+
+        .btn:hover {
+            background: #16213e;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(26, 26, 46, 0.2);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: #e8eaed;
+            color: #1a1a2e;
+            margin-left: 8px;
+        }
+
+        .btn-secondary:hover {
+            background: #d8dade;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .win-message {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .win-message.show {
+            display: flex;
+        }
+
+        .win-content {
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            animation: popIn 0.4s ease;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .win-content h2 {
+            color: #1a1a2e;
+            font-size: 1.6em;
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+
+        .win-content p {
+            color: #666;
+            margin-bottom: 24px;
+            font-size: 1em;
+        }
+
+        .instructions {
+            margin-top: 16px;
+            color: #999;
+            font-size: 0.85em;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>숫자 메모리 게임</h1>
+        
+        <div class="setup-panel" id="setupPanel">
+            <h3>카드 내용 설정</h3>
+            <p>각 칸에 원하는 글을 입력하세요. 비워두면 숫자가 사용됩니다.</p>
+            <div class="input-grid" id="inputGrid">
+                <input type="text" id="input0" maxlength="4" placeholder="1">
+                <input type="text" id="input1" maxlength="4" placeholder="2">
+                <input type="text" id="input2" maxlength="4" placeholder="3">
+                <input type="text" id="input3" maxlength="4" placeholder="4">
+                <input type="text" id="input4" maxlength="4" placeholder="5">
+                <input type="text" id="input5" maxlength="4" placeholder="6">
+                <input type="text" id="input6" maxlength="4" placeholder="7">
+                <input type="text" id="input7" maxlength="4" placeholder="8">
+            </div>
+            <button class="btn" onclick="startGame()">설정하고 시작</button>
+        </div>
+
+        <div class="stats" id="statsPanel" style="display: none;">
+            <div class="stat">
+                <div class="stat-label">시도 횟수</div>
+                <div class="stat-value" id="attempts">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">시간</div>
+                <div class="stat-value" id="timer">0:00</div>
+            </div>
+        </div>
+
+        <div class="board" id="board" style="display: none;"></div>
+
+        <div id="controls" style="display: none;">
+            <button class="btn" onclick="showSetup()">카드 다시 설정</button>
+            <button class="btn btn-secondary" onclick="shuffle()">섞기</button>
+        </div>
+        
+        <p class="instructions" id="instructions" style="display: none;">카드를 눌러 뒤집고, 같은 글자 두 개를 찾아보세요.</p>
+    </div>
+
+    <div class="win-message" id="winMessage">
+        <div class="win-content">
+            <h2>잘 하셨습니다!</h2>
+            <p id="winText">모든 카드를 찾았습니다.</p>
+            <button class="btn" onclick="closeWinAndRestart()">다시 플레이</button>
+        </div>
+    </div>
+
+    <script>
+        const BOARD_SIZE = 4;
+        const TOTAL_CARDS = BOARD_SIZE * BOARD_SIZE;
+        const PAIRS = TOTAL_CARDS / 2;
+        
+        let cards = [];
+        let flippedCards = [];
+        let matchedPairs = 0;
+        let attempts = 0;
+        let seconds = 0;
+        let timerInterval = null;
+        let gameStarted = false;
+        let canFlip = true;
+
+        function getCardValues() {
+            const values = [];
+            for (let i = 0; i < PAIRS; i++) {
+                const input = document.getElementById(`input${i}`);
+                const val = input.value.trim();
+                values.push(val || (i + 1).toString());
+            }
+            return values;
+        }
+
+        function startGame() {
+            const values = getCardValues();
+            
+            // 카드 생성 (각 값 2장씩)
+            cards = [];
+            values.forEach(val => {
+                cards.push(val, val);
+            });
+            
+            // 섞기
+            for (let i = cards.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [cards[i], cards[j]] = [cards[j], cards[i]];
+            }
+            
+            // UI 전환
+            document.getElementById('setupPanel').style.display = 'none';
+            document.getElementById('statsPanel').style.display = 'flex';
+            document.getElementById('board').style.display = 'grid';
+            document.getElementById('controls').style.display = 'block';
+            document.getElementById('instructions').style.display = 'block';
+            
+            resetGame();
+        }
+
+        function showSetup() {
+            document.getElementById('setupPanel').style.display = 'block';
+            document.getElementById('statsPanel').style.display = 'none';
+            document.getElementById('board').style.display = 'none';
+            document.getElementById('controls').style.display = 'none';
+            document.getElementById('instructions').style.display = 'none';
+            document.getElementById('winMessage').classList.remove('show');
+            clearInterval(timerInterval);
+        }
+
+        function resetGame() {
+            flippedCards = [];
+            matchedPairs = 0;
+            attempts = 0;
+            seconds = 0;
+            gameStarted = false;
+            canFlip = true;
+            clearInterval(timerInterval);
+            timerInterval = null;
+            
+            updateDisplay();
+            render();
+        }
+
+        function shuffle() {
+            // 카드만 다시 섞기
+            for (let i = cards.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [cards[i], cards[j]] = [cards[j], cards[i]];
+            }
+            resetGame();
+        }
+
+        function render() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            
+            cards.forEach((val, index) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.dataset.index = index;
+                card.dataset.val = val;
+                
+                const front = document.createElement('div');
+                front.className = 'card-face card-front';
+                
+                const back = document.createElement('div');
+                back.className = 'card-face card-back';
+                back.textContent = val;
+                
+                card.appendChild(front);
+                card.appendChild(back);
+                card.onclick = () => flipCard(index);
+                board.appendChild(card);
+            });
+        }
+
+        function flipCard(index) {
+            const card = document.querySelector(`[data-index="${index}"]`);
+            
+            if (!canFlip || card.classList.contains('flipped') || card.classList.contains('matched')) {
+                return;
+            }
+            
+            if (!gameStarted) {
+                startTimer();
+                gameStarted = true;
+            }
+            
+            card.classList.add('flipped');
+            flippedCards.push(index);
+            
+            if (flippedCards.length === 2) {
+                attempts++;
+                updateDisplay();
+                checkMatch();
+            }
+        }
+
+        function checkMatch() {
+            const [first, second] = flippedCards;
+            const card1 = document.querySelector(`[data-index="${first}"]`);
+            const card2 = document.querySelector(`[data-index="${second}"]`);
+            
+            if (cards[first] === cards[second]) {
+                card1.classList.add('matched');
+                card2.classList.add('matched');
+                flippedCards = [];
+                matchedPairs++;
+                
+                if (matchedPairs === PAIRS) {
+                    clearInterval(timerInterval);
+                    setTimeout(showWin, 500);
+                }
+            } else {
+                canFlip = false;
+                card1.classList.add('wrong');
+                card2.classList.add('wrong');
+                
+                setTimeout(() => {
+                    card1.classList.remove('flipped', 'wrong');
+                    card2.classList.remove('flipped', 'wrong');
+                    flippedCards = [];
+                    canFlip = true;
+                }, 1000);
+            }
+        }
+
+        function showWin() {
+            const winText = document.getElementById('winText');
+            winText.textContent = `${attempts}번 만에 ${formatTime(seconds)} 걸렸습니다.`;
+            document.getElementById('winMessage').classList.add('show');
+        }
+
+        function closeWinAndRestart() {
+            document.getElementById('winMessage').classList.remove('show');
+            showSetup();
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                seconds++;
+                document.getElementById('timer').textContent = formatTime(seconds);
+            }, 1000);
+        }
+
+        function formatTime(secs) {
+            const mins = Math.floor(secs / 60);
+            const s = secs % 60;
+            return `${mins}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function updateDisplay() {
+            document.getElementById('attempts').textContent = attempts;
+            document.getElementById('timer').textContent = formatTime(seconds);
+        }
+    </script>
+</body>
+</html>

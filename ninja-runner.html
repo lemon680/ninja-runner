@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>닌자 러너</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .game-wrapper {
+            position: relative;
+            width: 800px;
+            max-width: 100%;
+        }
+
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 0 8px;
+        }
+
+        .score-display {
+            color: #fff;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .score-display span {
+            color: #00ffff;
+            font-size: 1.3em;
+            font-weight: 700;
+        }
+
+        .high-score {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .high-score span {
+            color: #ffd700;
+            font-weight: 600;
+        }
+
+        .skill-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #888;
+            font-size: 0.85em;
+        }
+
+        .skill-key {
+            background: #2a2a4a;
+            color: #00ffff;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 700;
+            border: 1px solid #00ffff;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            background: linear-gradient(180deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 2px solid #2a2a4a;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        /* 화면 흔들림 (사망) */
+        .game-container.shake {
+            animation: shake 0.5s ease-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-9px, 5px); }
+            40% { transform: translate(8px, -6px); }
+            60% { transform: translate(-6px, -3px); }
+            80% { transform: translate(5px, 4px); }
+        }
+
+        /* 피격 붉은 플래시 */
+        .damage-flash {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle, transparent 35%, rgba(255, 0, 40, 0.55) 100%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 60;
+        }
+
+        .damage-flash.on {
+            animation: flashAnim 0.7s ease-out forwards;
+        }
+
+        @keyframes flashAnim {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* 야간시야 */
+        .game-container.night-vision {
+            filter: brightness(1.4) saturate(0.55) contrast(1.05);
+        }
+
+        .nv-overlay {
+            position: absolute;
+            inset: 0;
+            display: none;
+            pointer-events: none;
+            z-index: 45;
+            background: radial-gradient(circle at 50% 45%, rgba(60, 255, 130, 0.10) 25%, rgba(0, 35, 10, 0.55) 95%);
+        }
+
+        .nv-overlay::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(0deg,
+                rgba(0, 255, 140, 0.08) 0px,
+                rgba(0, 255, 140, 0.08) 2px,
+                transparent 2px,
+                transparent 4px);
+        }
+
+        .nv-overlay::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            box-shadow: inset 0 0 90px 35px rgba(0, 0, 0, 0.75);
+            border-radius: 16px;
+        }
+
+        .nv-status {
+            position: absolute;
+            top: 10px;
+            left: 14px;
+            color: #6f6;
+            font-size: 0.8em;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px #0f0;
+        }
+
+        /* 배경 별 */
+        .stars {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .star {
+            position: absolute;
+            background: #fff;
+            border-radius: 50%;
+            animation: twinkle 2s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* 달 */
+        .moon {
+            position: absolute;
+            top: 30px;
+            right: 60px;
+            width: 60px;
+            height: 60px;
+            background: #f5f5dc;
+            border-radius: 50%;
+            box-shadow: 0 0 30px rgba(245, 245, 220, 0.4);
+        }
+
+        /* 바닥 */
+        .ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 60px;
+            background: linear-gradient(180deg, #2a2a4a 0%, #1a1a2e 100%);
+            border-top: 2px solid #3a3a5a;
+        }
+
+        .ground::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: repeating-linear-gradient(
+                90deg,
+                #3a3a5a 0px,
+                #3a3a5a 20px,
+                transparent 20px,
+                transparent 40px
+            );
+        }
+
+        /* 닌자 */
+        .ninja {
+            position: absolute;
+            bottom: 60px;
+            left: 80px;
+            width: 60px;
+            height: 80px;
+            z-index: 10;
+            transition: left 0.18s ease-out;
+        }
+
+        .ninja.dashing {
+            transition: left 0.18s cubic-bezier(0.2, 0.9, 0.3, 1);
+            filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.8));
+        }
+
+        .ninja.dying {
+            animation: ninjaDeath 0.8s ease-in forwards;
+        }
+
+        @keyframes ninjaDeath {
+            0% { transform: rotate(0deg); }
+            30% { transform: rotate(-18deg) translateY(-12px); }
+            100% { transform: rotate(-85deg) translateY(45px); filter: grayscale(1) brightness(0.6); }
+        }
+
+        .ninja-body {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .ninja-sprite {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.3));
+        }
+
+        .ninja.skill-active .ninja-sprite {
+            filter: drop-shadow(0 0 20px rgba(0, 255, 255, 0.8));
+        }
+
+        /* 대쉬 잔상 */
+        .afterimage {
+            position: absolute;
+            width: 60px;
+            height: 80px;
+            z-index: 9;
+            opacity: 0.35;
+            pointer-events: none;
+            filter: blur(1px) brightness(1.6) hue-rotate(160deg);
+        }
+
+        /* 검 스킬 애니메이션 */
+        .ninja.slashing .ninja-sprite {
+            animation: slash 0.4s ease-out;
+        }
+
+        @keyframes slash {
+            0% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-30deg) scale(1.1); }
+            50% { transform: rotate(30deg) scale(1.2); }
+            75% { transform: rotate(-10deg) scale(1.1); }
+            100% { transform: rotate(0deg) scale(1); }
+        }
+
+        .sword-slash {
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            pointer-events: none;
+            z-index: 20;
+            animation: slashEffect 0.4s ease-out forwards;
+        }
+
+        @keyframes slashEffect {
+            0% { opacity: 1; transform: scale(0.5) rotate(-45deg); }
+            50% { opacity: 1; transform: scale(1.2) rotate(0deg); }
+            100% { opacity: 0; transform: scale(1.5) rotate(45deg); }
+        }
+
+        /* 장애물 */
+        .obstacle {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            z-index: 5;
+        }
+
+        .obstacle-sprite {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* 장애물 파괴 애니메이션 */
+        .obstacle.destroying {
+            animation: destroySplit 0.5s ease-out forwards;
+        }
+
+        @keyframes destroySplit {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+            100% { transform: scale(0) rotate(180deg); opacity: 0; }
+        }
+
+        .obstacle-half {
+            position: absolute;
+            width: 50%;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .obstacle-half.left {
+            left: 0;
+            animation: splitLeft 0.5s ease-out forwards;
+        }
+
+        .obstacle-half.right {
+            right: 0;
+            animation: splitRight 0.5s ease-out forwards;
+        }
+
+        .obstacle-half img {
+            width: 200%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .obstacle-half.right img {
+            margin-left: -100%;
+        }
+
+        /* 대각선 갈라짐 */
+        @keyframes splitLeft {
+            0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+            100% { transform: translate(-40px, -40px) rotate(-90deg); opacity: 0; }
+        }
+
+        @keyframes splitRight {
+            0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+            100% { transform: translate(40px, 40px) rotate(90deg); opacity: 0; }
+        }
+
+        /* 파티클 효과 */
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #00ffff;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particleFade 0.5s ease-out forwards;
+        }
+
+        @keyframes particleFade {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0) translateY(-20px); }
+        }
+
+        /* 점수 팝업 */
+        .score-popup {
+            position: absolute;
+            color: #00ffff;
+            font-size: 1.2em;
+            font-weight: 700;
+            pointer-events: none;
+            animation: scoreFloat 0.8s ease-out forwards;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            z-index: 50;
+        }
+
+        @keyframes scoreFloat {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-40px); }
+        }
+
+        /* 게임 오버 */
+        .game-over {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 0, 5, 0.88);
+            backdrop-filter: blur(4px);
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 100;
+            border-radius: 16px;
+        }
+
+        .game-over.show {
+            display: flex;
+        }
+
+        /* GAME OVER 글자가 하나씩 떨어지는 연출 */
+        .go-title {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 6px;
+        }
+
+        .go-title span {
+            display: inline-block;
+            font-size: 2.5em;
+            font-weight: 900;
+            color: #ff5252;
+            opacity: 0;
+            transform: translateY(-60px) scale(1.6);
+            animation: letterDrop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) forwards;
+            text-shadow: 0 0 22px rgba(255, 60, 60, 0.7), 0 4px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        .go-title span.gap {
+            width: 18px;
+            animation: none;
+            opacity: 1;
+        }
+
+        .go-title span:nth-child(1) { animation-delay: 0.05s; }
+        .go-title span:nth-child(2) { animation-delay: 0.12s; }
+        .go-title span:nth-child(3) { animation-delay: 0.19s; }
+        .go-title span:nth-child(4) { animation-delay: 0.26s; }
+        .go-title span:nth-child(6) { animation-delay: 0.38s; }
+        .go-title span:nth-child(7) { animation-delay: 0.45s; }
+        .go-title span:nth-child(8) { animation-delay: 0.52s; }
+        .go-title span:nth-child(9) { animation-delay: 0.59s; }
+
+        @keyframes letterDrop {
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .go-sub {
+            color: #999;
+            font-size: 1em;
+            margin-bottom: 16px;
+            opacity: 0;
+            animation: fadeUp 0.5s ease-out 0.35s forwards;
+        }
+
+        .new-record {
+            display: none;
+            color: #ffd700;
+            font-weight: 800;
+            font-size: 1.15em;
+            margin-bottom: 10px;
+            animation: recordPulse 0.7s infinite alternate;
+            text-shadow: 0 0 14px rgba(255, 215, 0, 0.7);
+        }
+
+        .new-record.show {
+            display: block;
+        }
+
+        @keyframes recordPulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.12); }
+        }
+
+        .go-stats {
+            text-align: center;
+            opacity: 0;
+            animation: fadeUp 0.5s ease-out 0.5s forwards;
+        }
+
+        .final-score {
+            color: #00ffff;
+            font-size: 1.5em;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .go-best {
+            color: #888;
+            font-size: 0.95em;
+            margin-bottom: 22px;
+        }
+
+        .go-best span {
+            color: #ffd700;
+            font-weight: 600;
+        }
+
+        .game-over .btn {
+            opacity: 0;
+            animation: fadeUp 0.5s ease-out 0.65s forwards;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .btn {
+            background: #1a1a2e;
+            color: #fff;
+            border: 2px solid #00ffff;
+            padding: 12px 32px;
+            font-size: 1em;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background: #00ffff;
+            color: #1a1a2e;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+        }
+
+        /* 시작 화면 */
+        .start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(4px);
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 100;
+            border-radius: 16px;
+        }
+
+        .start-screen h1 {
+            color: #00ffff;
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            font-weight: 700;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+
+        .start-screen p {
+            color: #888;
+            margin-bottom: 30px;
+            font-size: 1em;
+        }
+
+        .controls-info {
+            color: #666;
+            font-size: 0.85em;
+            margin-top: 20px;
+            text-align: center;
+            line-height: 1.9;
+        }
+
+        .controls-info kbd {
+            background: #2a2a4a;
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: #00ffff;
+            font-family: inherit;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-wrapper">
+        <div class="game-header">
+            <div class="score-display">점수: <span id="score">0</span></div>
+            <div class="skill-bar">
+                <span class="skill-key">Q</span><span>검</span>
+                <span class="skill-key">E</span><span>대쉬</span>
+                <span class="skill-key">Y</span><span>야간시야</span>
+            </div>
+            <div class="high-score">최고 기록: <span id="highScore">0</span></div>
+        </div>
+
+        <div class="game-container" id="gameContainer">
+            <!-- 배경 요소 -->
+            <div class="stars" id="stars"></div>
+            <div class="moon"></div>
+            <div class="ground"></div>
+
+            <!-- 닌자 -->
+            <div class="ninja" id="ninja">
+                <div class="ninja-body">
+                    <img src="https://opengameart.org/sites/default/files/ninja_idle_0.png" alt="닌자" class="ninja-sprite" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 60 80%22><rect x=%2215%22 y=%2210%22 width=%2230%22 height=%2240%22 rx=%225%22 fill=%22%23333%22/><rect x=%2220%22 y=%2250%22 width=%2220%22 height=%2225%22 rx=%223%22 fill=%22%23222%22/><circle cx=%2230%22 cy=%2225%22 r=%2212%22 fill=%22%23ffdbac%22/><rect x=%2218%22 y=%2218%22 width=%2224%22 height=%228%22 fill=%22%23111%22/><rect x=%2222%22 y=%2235%22 width=%2216%22 height=%224%22 fill=%22%23c00%22"/></svg>'">
+                </div>
+            </div>
+
+            <!-- 야간시야 오버레이 -->
+            <div class="nv-overlay" id="nvOverlay">
+                <div class="nv-status">NIGHT VISION ON</div>
+            </div>
+
+            <!-- 피격 플래시 -->
+            <div class="damage-flash" id="damageFlash"></div>
+
+            <!-- 시작 화면 -->
+            <div class="start-screen" id="startScreen">
+                <h1>닌자 러너</h1>
+                <p>장애물을 검으로 베고 대쉬하며 생존하세요</p>
+                <button class="btn" onclick="startGame()">게임 시작</button>
+                <div class="controls-info">
+                    <kbd>Space</kbd>/<kbd>↑</kbd>/<kbd>W</kbd> : 점프 (무한) &nbsp;
+                    <kbd>↓</kbd>/<kbd>S</kbd> : 슬라이드<br>
+                    <kbd>A</kbd>/<kbd>D</kbd> : 이동 &nbsp;
+                    <kbd>Q</kbd> : 검 스킬 &nbsp;
+                    <kbd>E</kbd> : 대쉬 (100) &nbsp;
+                    <kbd>Y</kbd> : 야간시야
+                </div>
+            </div>
+
+            <!-- 게임 오버 -->
+            <div class="game-over" id="gameOver">
+                <div class="go-title">
+                    <span>G</span><span>A</span><span>M</span><span>E</span><span class="gap"></span><span>O</span><span>V</span><span>E</span><span>R</span>
+                </div>
+                <div class="go-sub">닌자가 쓰러졌습니다...</div>
+                <div class="new-record" id="newRecord">🏆 신기록 달성!</div>
+                <div class="go-stats">
+                    <div class="final-score">점수: <span id="finalScore">0</span></div>
+                    <div class="go-best">최고 기록: <span id="goBest">0</span></div>
+                </div>
+                <button class="btn" onclick="restartGame()">다시 시작</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const gameContainer = document.getElementById('gameContainer');
+        const ninja = document.getElementById('ninja');
+        const scoreDisplay = document.getElementById('score');
+        const highScoreDisplay = document.getElementById('highScore');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOver');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const goBestDisplay = document.getElementById('goBest');
+        const newRecordBadge = document.getElementById('newRecord');
+        const nvOverlay = document.getElementById('nvOverlay');
+        const damageFlash = document.getElementById('damageFlash');
+
+        let score = 0;
+        let highScore = 0;
+        let gameRunning = false;
+        let obstacles = [];
+        let spawnRate = 2000;
+        let lastSpawn = 0;
+        let gameLoop;
+        let isSliding = false;
+        let dashing = false;
+        let nightVision = false;
+
+        // 점프 관련 변수 (bottom 기준: 위쪽이 +)
+        let ninjaY = 60;
+        let velocityY = 0;
+        let gravity = 0.8;
+        let jumpForce = 15;
+        let isJumping = false;
+        let groundY = 60;
+        let maxJumpHeight = 200;
+
+        // 장애물 이미지들
+        const obstacleImages = [
+            'https://pngimg.com/uploads/airplane/airplane_PNG101213.png',
+            'https://pngimg.com/uploads/car/car_PNG11314.png',
+            'https://freepngimg.com/img/bamboo/1600x1505',
+            'https://pngimg.com/uploads/chair/chair_PNG6862.png',
+            'https://pngimg.com/uploads/building/building_PNG1865.png',
+            'https://pngimg.com/uploads/clock/clock_PNG101213.png',
+            'https://pngimg.com/uploads/warship/warship_PNG101213.png',
+            'https://pngimg.com/uploads/fighter_jet/fighter_jet_PNG43.png',
+            'https://pngimg.com/uploads/computer/computer_PNG101213.png',
+            'https://pngimg.com/uploads/smartphone/smartphone_PNG8511.png',
+            'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Flag_of_the_People%27s_Republic_of_China.svg/2000px-Flag_of_the_People%27s_Republic_of_China.svg.png'
+        ];
+
+        // 최고 점수 로드
+        highScore = parseInt(localStorage.getItem('ninjaHighScore')) || 0;
+        highScoreDisplay.textContent = highScore;
+
+        // 모니터 크기에 따른 점프 높이 조정
+        function adjustJumpHeight() {
+            const screenHeight = window.innerHeight;
+            const containerHeight = gameContainer.offsetHeight;
+            maxJumpHeight = Math.min(screenHeight * 0.4, containerHeight * 0.6);
+            jumpForce = Math.sqrt(2 * gravity * maxJumpHeight);
+        }
+
+        // 별 생성
+        function createStars() {
+            const starsContainer = document.getElementById('stars');
+            for (let i = 0; i < 50; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 60 + '%';
+                star.style.width = Math.random() * 3 + 1 + 'px';
+                star.style.height = star.style.width;
+                star.style.animationDelay = Math.random() * 2 + 's';
+                starsContainer.appendChild(star);
+            }
+        }
+
+        // 장애물 생성 (앞에서 각기 다른 속도로)
+        function spawnObstacle() {
+            const obstacle = document.createElement('div');
+            obstacle.className = 'obstacle';
+
+            const imgSrc = obstacleImages[Math.floor(Math.random() * obstacleImages.length)];
+            obstacle.innerHTML = `<img src="${imgSrc}" class="obstacle-sprite" alt="장애물" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22><rect width=%2250%22 height=%2250%22 fill=%22%23666%22 rx=%225%22/><text x=%2225%22 y=%2230%22 text-anchor=%22middle%22 fill=%22%23fff%22 font-size=%2212%22>?</text></svg>'">`;
+
+            // 랜덤 속도 (3~12)
+            const speed = 3 + Math.random() * 9;
+            obstacle.dataset.speed = speed;
+
+            // 오른쪽(앞)에서 생성, 랜덤 높이
+            const bottomPositions = [60, 100, 140, 180, 220];
+            const bottom = bottomPositions[Math.floor(Math.random() * bottomPositions.length)];
+
+            obstacle.style.right = '-60px';
+            obstacle.style.bottom = bottom + 'px';
+
+            gameContainer.appendChild(obstacle);
+            obstacles.push(obstacle);
+        }
+
+        // 점프 (부드러운 물리 기반, 무한 가능) — 위로 점프
+        function jump() {
+            if (!gameRunning) return;
+
+            if (ninjaY < groundY + maxJumpHeight) {
+                const onGround = ninjaY <= groundY + 1;
+                velocityY = jumpForce * (onGround ? 1 : 0.75);
+                isJumping = true;
+                createParticles();
+            }
+        }
+
+        // 슬라이드
+        function slide() {
+            if (isSliding || !gameRunning) return;
+            isSliding = true;
+            ninja.style.height = '40px';
+
+            setTimeout(() => {
+                ninja.style.height = '80px';
+                isSliding = false;
+            }, 500);
+        }
+
+        // 좌우 이동
+        function moveX(dx) {
+            if (!gameRunning) return;
+            const current = parseFloat(ninja.style.left) || 80;
+            const target = Math.min(Math.max(current + dx, 20), gameContainer.offsetWidth - 100);
+            ninja.style.left = target + 'px';
+        }
+
+        // 대쉬 (E키): 검을 뽑으며 앞으로 100px 돌진
+        function dash() {
+            if (!gameRunning || dashing) return;
+            dashing = true;
+
+            const startLeft = parseFloat(ninja.style.left) || 80;
+            const targetLeft = Math.min(startLeft + 100, gameContainer.offsetWidth - 100);
+
+            ninja.classList.add('dashing', 'slashing');
+            ninja.style.left = targetLeft + 'px';
+
+            // 잔상
+            for (let i = 1; i <= 3; i++) {
+                setTimeout(() => {
+                    const ghost = document.createElement('div');
+                    ghost.className = 'afterimage';
+                    ghost.style.left = (startLeft + (targetLeft - startLeft) * i / 3) + 'px';
+                    ghost.style.bottom = ninja.style.bottom;
+                    ghost.innerHTML = ninja.querySelector('.ninja-body').innerHTML;
+                    gameContainer.appendChild(ghost);
+                    setTimeout(() => ghost.remove(), 300);
+                }, i * 60);
+            }
+
+            // 검 이펙트
+            const slash = document.createElement('div');
+            slash.className = 'sword-slash';
+            slash.style.left = (targetLeft - 50) + 'px';
+            slash.style.bottom = (ninjaY - 25) + 'px';
+            slash.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 150"><path d="M75 0 L85 60 L150 75 L85 90 L75 150 L65 90 L0 75 L65 60 Z" fill="rgba(255,255,255,0.5)" stroke="#fff" stroke-width="2"/></svg>';
+            gameContainer.appendChild(slash);
+            setTimeout(() => slash.remove(), 400);
+
+            setTimeout(() => {
+                ninja.classList.remove('dashing');
+                ninja.style.left = startLeft + 'px';
+                setTimeout(() => {
+                    ninja.classList.remove('slashing');
+                    dashing = false;
+                }, 200);
+            }, 350);
+        }
+
+        // 야간시야 (Y키)
+        function toggleNightVision() {
+            nightVision = !nightVision;
+            gameContainer.classList.toggle('night-vision', nightVision);
+            nvOverlay.style.display = nightVision ? 'block' : 'none';
+        }
+
+        // 검 스킬 (Q키, 쿨타임 없음)
+        function useSkill() {
+            if (!gameRunning) return;
+            ninja.classList.add('skill-active', 'slashing');
+
+            const slash = document.createElement('div');
+            slash.className = 'sword-slash';
+            slash.style.left = '60px';
+            slash.style.bottom = '60px';
+            slash.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 150"><path d="M75 0 L85 60 L150 75 L85 90 L75 150 L65 90 L0 75 L65 60 Z" fill="rgba(0,255,255,0.6)" stroke="#00ffff" stroke-width="2"/></svg>';
+            gameContainer.appendChild(slash);
+
+            setTimeout(() => slash.remove(), 400);
+
+            const ninjaRect = ninja.getBoundingClientRect();
+            const containerRect = gameContainer.getBoundingClientRect();
+            const ninjaCenterX = ninjaRect.left - containerRect.left + ninjaRect.width / 2;
+            const ninjaCenterY = ninjaRect.top - containerRect.top + ninjaRect.height / 2;
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obstacle = obstacles[i];
+                const obsRect = obstacle.getBoundingClientRect();
+                const obsCenterX = obsRect.left - containerRect.left + obsRect.width / 2;
+                const obsCenterY = obsRect.top - containerRect.top + obsRect.height / 2;
+
+                const distance = Math.sqrt(
+                    Math.pow(ninjaCenterX - obsCenterX, 2) +
+                    Math.pow(ninjaCenterY - obsCenterY, 2)
+                );
+
+                if (distance < 200) {
+                    destroyObstacle(obstacle, i);
+                }
+            }
+
+            setTimeout(() => {
+                ninja.classList.remove('skill-active', 'slashing');
+            }, 400);
+        }
+
+        // 장애물 파괴 (대각선 반 쪼개기)
+        function destroyObstacle(obstacle, index) {
+            const obsRect = obstacle.getBoundingClientRect();
+            const containerRect = gameContainer.getBoundingClientRect();
+            const obsCenterX = obsRect.left - containerRect.left + obsRect.width / 2;
+            const obsCenterY = obsRect.top - containerRect.top + obsRect.height / 2;
+
+            const img = obstacle.querySelector('img');
+            const imgSrc = img ? img.src : '';
+
+            const leftHalf = document.createElement('div');
+            leftHalf.className = 'obstacle-half left';
+            leftHalf.style.left = (obsCenterX - 25) + 'px';
+            leftHalf.style.top = (obsCenterY - 25) + 'px';
+            leftHalf.style.width = '25px';
+            leftHalf.style.height = '50px';
+            leftHalf.innerHTML = `<img src="${imgSrc}" alt="">`;
+
+            const rightHalf = document.createElement('div');
+            rightHalf.className = 'obstacle-half right';
+            rightHalf.style.left = (obsCenterX) + 'px';
+            rightHalf.style.top = (obsCenterY - 25) + 'px';
+            rightHalf.style.width = '25px';
+            rightHalf.style.height = '50px';
+            rightHalf.innerHTML = `<img src="${imgSrc}" alt="">`;
+
+            gameContainer.appendChild(leftHalf);
+            gameContainer.appendChild(rightHalf);
+
+            obstacle.remove();
+            obstacles.splice(index, 1);
+
+            setTimeout(() => {
+                leftHalf.remove();
+                rightHalf.remove();
+            }, 500);
+
+            increaseScore();
+        }
+
+        // 파티클 생성
+        function createParticles() {
+            for (let i = 0; i < 5; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = (parseFloat(ninja.style.left) + Math.random() * 20) + 'px';
+                particle.style.bottom = (ninjaY + Math.random() * 40) + 'px';
+                particle.style.animationDelay = (Math.random() * 0.2) + 's';
+                gameContainer.appendChild(particle);
+
+                setTimeout(() => particle.remove(), 700);
+            }
+        }
+
+        // 점수 증가
+        function increaseScore() {
+            score++;
+            scoreDisplay.textContent = score;
+
+            const popup = document.createElement('div');
+            popup.className = 'score-popup';
+            popup.textContent = '+1';
+            popup.style.left = (parseFloat(ninja.style.left) + 20) + 'px';
+            popup.style.bottom = (ninjaY + 90) + 'px';
+            gameContainer.appendChild(popup);
+
+            setTimeout(() => popup.remove(), 800);
+        }
+
+        // 충돌 감지
+        function checkCollision(obstacle) {
+            const ninjaRect = ninja.getBoundingClientRect();
+            const obstacleRect = obstacle.getBoundingClientRect();
+
+            if (isSliding) {
+                ninjaRect.height = 40;
+                ninjaRect.bottom = ninjaRect.top + 40;
+            }
+
+            return !(
+                ninjaRect.right < obstacleRect.left ||
+                ninjaRect.left > obstacleRect.right ||
+                ninjaRect.bottom < obstacleRect.top ||
+                ninjaRect.top > obstacleRect.bottom
+            );
+        }
+
+        // 닌자 물리 업데이트 (중력은 아래로, 점프는 위로)
+        function updateNinjaPhysics() {
+            velocityY -= gravity;
+            ninjaY += velocityY;
+
+            if (ninjaY <= groundY) {
+                ninjaY = groundY;
+                velocityY = 0;
+                isJumping = false;
+            }
+
+            if (ninjaY > groundY + maxJumpHeight) {
+                ninjaY = groundY + maxJumpHeight;
+                velocityY = Math.min(velocityY, 0);
+            }
+
+            ninja.style.bottom = ninjaY + 'px';
+        }
+
+        // 게임 루프
+        function update(timestamp) {
+            if (!gameRunning) return;
+
+            // 닌자 물리 업데이트
+            updateNinjaPhysics();
+
+            // 장애물 생성
+            if (timestamp - lastSpawn > spawnRate) {
+                spawnObstacle();
+                lastSpawn = timestamp;
+
+                if (spawnRate > 800) spawnRate -= 20;
+            }
+
+            // 장애물 이동 및 충돌 체크
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obstacle = obstacles[i];
+                const speed = parseFloat(obstacle.dataset.speed) || 5;
+
+                // 오른쪽에서 왼쪽으로 (각기 다른 속도)
+                const currentRight = parseFloat(obstacle.style.right) || 0;
+                obstacle.style.right = (currentRight + speed) + 'px';
+
+                // 충돌 체크
+                if (checkCollision(obstacle)) {
+                    endGame();
+                    return;
+                }
+
+                // 화면 밖으로 나간 장애물 제거
+                if (currentRight > gameContainer.offsetWidth + 80) {
+                    obstacle.remove();
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            gameLoop = requestAnimationFrame(update);
+        }
+
+        // 게임 시작
+        function startGame() {
+            startScreen.style.display = 'none';
+            gameRunning = true;
+            score = 0;
+            spawnRate = 2000;
+            lastSpawn = 0;
+            ninjaY = groundY;
+            velocityY = 0;
+            isJumping = false;
+            dashing = false;
+            scoreDisplay.textContent = '0';
+            adjustJumpHeight();
+            gameLoop = requestAnimationFrame(update);
+        }
+
+        // 게임 종료 (사망 연출)
+        function endGame() {
+            gameRunning = false;
+            cancelAnimationFrame(gameLoop);
+
+            const isNewRecord = score > highScore;
+            if (isNewRecord) {
+                highScore = score;
+                localStorage.setItem('ninjaHighScore', highScore);
+                highScoreDisplay.textContent = highScore;
+            }
+
+            // 사망 연출: 화면 흔들림 + 붉은 플래시 + 닌자 쓰러짐
+            gameContainer.classList.add('shake');
+            damageFlash.classList.remove('on');
+            void damageFlash.offsetWidth;
+            damageFlash.classList.add('on');
+            ninja.classList.add('dying');
+
+            setTimeout(() => {
+                gameContainer.classList.remove('shake');
+                newRecordBadge.classList.toggle('show', isNewRecord);
+                goBestDisplay.textContent = highScore;
+                finalScoreDisplay.textContent = '0';
+                gameOverScreen.classList.add('show');
+
+                // 점수 카운트업
+                let display = 0;
+                const step = Math.max(1, Math.ceil(score / 30));
+                const timer = setInterval(() => {
+                    display += step;
+                    if (display >= score) {
+                        display = score;
+                        clearInterval(timer);
+                    }
+                    finalScoreDisplay.textContent = display;
+                }, 30);
+            }, 800);
+        }
+
+        // 재시작
+        function restartGame() {
+            obstacles.forEach(o => o.remove());
+            obstacles = [];
+
+            ninja.classList.remove('dying', 'dashing', 'slashing', 'skill-active');
+            ninja.style.left = '80px';
+            ninja.style.height = '80px';
+            isSliding = false;
+
+            gameOverScreen.classList.remove('show');
+            startGame();
+        }
+
+        // 키보드 이벤트
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+                e.preventDefault();
+                if (!gameRunning && startScreen.style.display !== 'none') {
+                    startGame();
+                } else {
+                    jump();
+                }
+            }
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+                e.preventDefault();
+                slide();
+            }
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+                e.preventDefault();
+                moveX(-30);
+            }
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+                e.preventDefault();
+                moveX(30);
+            }
+            if (e.code === 'KeyQ') {
+                e.preventDefault();
+                useSkill();
+            }
+            if (e.code === 'KeyE') {
+                e.preventDefault();
+                dash();
+            }
+            if (e.code === 'KeyY') {
+                e.preventDefault();
+                toggleNightVision();
+            }
+        });
+
+        // 터치 지원
+        gameContainer.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!gameRunning) {
+                startGame();
+            } else {
+                const touch = e.touches[0];
+                const rect = gameContainer.getBoundingClientRect();
+                const y = touch.clientY - rect.top;
+
+                if (y < rect.height / 2) {
+                    jump();
+                } else {
+                    slide();
+                }
+            }
+        });
+
+        // 윈도우 리사이즈 시 점프 높이 재조정
+        window.addEventListener('resize', () => {
+            adjustJumpHeight();
+        });
+
+        // 초기화
+        createStars();
+        adjustJumpHeight();
+    </script>
+</body>
+</html>
